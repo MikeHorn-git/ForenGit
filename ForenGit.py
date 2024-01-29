@@ -5,6 +5,7 @@ import re
 import sys
 import subprocess
 from pathlib import Path
+from tqdm import tqdm
 
 def is_git_repository(path='.'):
     git_dir = Path(path) / '.git'
@@ -14,7 +15,7 @@ def is_git_repository(path='.'):
         print(f'FATAL ERROR: {Path(path).resolve()} is not a Git repository')
         sys.exit(1)
 
-def run_git_command(command):
+def run_command(command):
     result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     return result
 
@@ -25,7 +26,7 @@ def git_blame(filename, search_query=None):
         command.extend(['-S', " ".join(search_query)])
 
     command.append(filename)
-    return run_git_command(command).stdout
+    return run_command(command)
 
 def git_branches(search_query=None):
     command = ['git', 'branch', '--all']
@@ -33,7 +34,7 @@ def git_branches(search_query=None):
     if search_query:
         command.extend(['--contains', search_query])
 
-    return run_git_command(command).stdout
+    return run_command(command)
 
 def git_deleted(search_query=None):
     command = ['git', 'log', '--diff-filter=D', '--summary']
@@ -41,19 +42,23 @@ def git_deleted(search_query=None):
     if search_query:
         command.extend(['--grep', search_query])
 
-    return run_git_command(command).stdout
+    return run_command(command)
 
 def git_emails(repository_path='.'):
     command = ['git', 'log', '--pretty=format:%ae %ce']
-    result = run_git_command(command)
+    result = run_command(command)
     log_output = result.stdout
 
     emails = set()
     email_pattern = re.compile(r'[\w\.-]+@[\w\.-]+')
     emails = set(email_pattern.findall(log_output))
 
-    for email in emails:
-        print(f"- {email}")
+    if emails:
+        for email in emails:
+            print(f"{email}")
+        return f"{len(emails)} emails found"
+    else:
+        return print("No emails found")
 
 def git_history(search_query=None):
     command = ['git', 'log', '--name-status']
@@ -61,7 +66,7 @@ def git_history(search_query=None):
     if search_query:
         command.extend(['--grep', search_query])
 
-    return run_git_command(command).stdout
+    return run_command(command)
 
 def git_log(search_query=None):
     command = ['git', 'log', '--all', '--graph', '--oneline', '--decorate']
@@ -69,7 +74,7 @@ def git_log(search_query=None):
     if search_query:
         command.extend(['--grep', search_query])
 
-    return run_git_command(command).stdout
+    return run_command(command)
 
 def git_reflog(search_query=None):
     command = ['git', 'reflog']
@@ -77,13 +82,38 @@ def git_reflog(search_query=None):
     if search_query:
         command.extend(['--grep', search_query])
 
-    return run_git_command(command).stdout
-
-def gource():
-    return subprocess.run(['gource'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    return run_command(command)
 
 def trivy():
-    return subprocess.run(['trivy', 'repository', '.'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    command = ['trivy', 'repository', '.'] 
+    return run_command(command).stdout
+
+def virustotal():
+    command =  ['git', 'ls-files']
+    result = run_command(command)
+    files = result.stdout.split('\n')
+    found_match = False
+
+    for file in tqdm(files, desc="Scanning files", unit="file"):
+        if file:
+            command = ['git', 'hash-object', file]
+            result = run_command(command)
+            file_hash = result.stdout.strip()
+            vt_command = ['vt', 'file', file_hash]
+            vt_result = run_command(vt_command)
+            
+            if vt_result.stdout:
+                print(f"Results for {file}:")
+                print(vt_result.stdout)
+                print()
+                found_match = True
+
+    if not found_match:
+        print("No matches found")
+
+def visualize():
+    command = ['gource']
+    return run_command(command)
 
 def export_to_json(data, filename):
     with open(filename, 'w') as json_file:
@@ -102,11 +132,12 @@ def main():
     parser.add_argument('--branches', action='store_true', help='Display information about branches')
     parser.add_argument('--deleted', action='store_true', help='Display Git deleted files')
     parser.add_argument('--emails', action='store_true', help='Display associated emails with this Git repository')
-    parser.add_argument('--gource', action='store_true', help='Display Git visualization gui')
     parser.add_argument('--history', action='store_true', help='Display Git log with name-status')
     parser.add_argument('--log', action='store_true', help='Display Git log')
     parser.add_argument('--reflog', action='store_true', help='Display Git reflog')
     parser.add_argument('--trivy', action='store_true', help='Run Trivy on the repository')
+    parser.add_argument('--virustotal', action='store_true', help='Run vt against all the hash')
+    parser.add_argument('--visualize', action='store_true', help='Display Git visualization gui with gource')
     parser.add_argument('--search', metavar='search_query', help='Search for commits based on keywords or patterns in commit messages')
     parser.add_argument('--csv', metavar='filename.csv', help='Export data to CSV file')
     parser.add_argument('--json', metavar='filename.json', help='Export data to JSON file')
@@ -142,13 +173,16 @@ def main():
         if args.reflog:
             data.append(git_reflog(search_query))
 
-        if args.gource:
-            gource()
-
         if args.trivy:
             trivy_output = trivy()
-            if trivy_output.stdout:
-                print(f'{trivy_output.stdout}')
+            if trivy_output:
+                print(f'{trivy_output}')
+        
+        if args.virustotal:
+            virustotal()
+
+        if args.visualize:
+            visualize()
 
         if args.csv:
             export_to_csv(data, args.csv)
