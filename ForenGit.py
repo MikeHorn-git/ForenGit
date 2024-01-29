@@ -19,25 +19,26 @@ def run_command(command):
     result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     return result
 
-def git_blame(filename, search_query=None):
-    command = ['git', 'blame']
+def git_author(search_query=None):
+    command = "git log --format='%aN' | sort -u"
 
     if search_query:
-        command.extend(['-S', " ".join(search_query)])
+        command.extend(['--grep', search_query])
 
-    command.append(filename)
-    return run_command(command)
+    result = subprocess.run(command, shell=True, capture_output=True, text=True)
+    return result.stdout
 
-def git_branches(search_query=None):
-    command = ['git', 'branch', '--all']
-
-    if search_query:
-        command.extend(['--contains', search_query])
-
-    return run_command(command)
+def git_check(search_query=None):
+    command = ['git', 'fsck', '--full', '--unreachable', '--lost-found']
+    result = run_command(command).stdout.strip()
+    
+    if result:
+        return result
+    else:
+        return "No issue found"
 
 def git_deleted(search_query=None):
-    command = ['git', 'log', '--diff-filter=D', '--summary']
+    command = ['git', 'log', '--diff-filter=D', '--name-only', '--pretty=format:']
 
     if search_query:
         command.extend(['--grep', search_query])
@@ -59,30 +60,6 @@ def git_emails(repository_path='.'):
         return f"{len(emails)} emails found"
     else:
         return print("No emails found")
-
-def git_history(search_query=None):
-    command = ['git', 'log', '--name-status']
-
-    if search_query:
-        command.extend(['--grep', search_query])
-
-    return run_command(command)
-
-def git_log(search_query=None):
-    command = ['git', 'log', '--all', '--graph', '--oneline', '--decorate']
-
-    if search_query:
-        command.extend(['--grep', search_query])
-
-    return run_command(command)
-
-def git_reflog(search_query=None):
-    command = ['git', 'reflog']
-
-    if search_query:
-        command.extend(['--grep', search_query])
-
-    return run_command(command)
 
 def trivy():
     command = ['trivy', 'repository', '.'] 
@@ -128,13 +105,10 @@ def export_to_csv(data, filename):
 def main():
     is_git_repository()
     parser = argparse.ArgumentParser(description='A simple Git Forensic tool')
-    parser.add_argument('--blame', metavar=('filename', 'search_query'), nargs='+', help='Run Git blame on a specific file')
-    parser.add_argument('--branches', action='store_true', help='Display information about branches')
+    parser.add_argument('--author', action='store_true', help='Display author link to a Git repository')
+    parser.add_argument('--check', action='store_true', help='Run a Git file system check')
     parser.add_argument('--deleted', action='store_true', help='Display Git deleted files')
     parser.add_argument('--emails', action='store_true', help='Display associated emails with this Git repository')
-    parser.add_argument('--history', action='store_true', help='Display Git log with name-status')
-    parser.add_argument('--log', action='store_true', help='Display Git log')
-    parser.add_argument('--reflog', action='store_true', help='Display Git reflog')
     parser.add_argument('--trivy', action='store_true', help='Run Trivy on the repository')
     parser.add_argument('--virustotal', action='store_true', help='Run vt against all the hash')
     parser.add_argument('--visualize', action='store_true', help='Display Git visualization gui with gource')
@@ -150,28 +124,20 @@ def main():
         data = []
 
         search_query = args.search
+ 
+        if args.author:
+            data.append(git_author(search_query))
 
-        if args.blame:
-            filename, blame_search_query = args.blame
-            data.append(git_blame(filename, blame_search_query or search_query))
-
-        if args.branches:
-            data.append(git_branches(search_query))
+        if args.check:
+            check_output = git_check()
+            if check_output:
+                print(check_output)
 
         if args.deleted:
             data.append(git_deleted(search_query))
         
         if args.emails:
             data.append(git_emails(search_query))
-
-        if args.history:
-            data.append(git_history(search_query))
-
-        if args.log:
-            data.append(git_log(search_query))
-
-        if args.reflog:
-            data.append(git_reflog(search_query))
 
         if args.trivy:
             trivy_output = trivy()
