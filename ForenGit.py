@@ -2,6 +2,7 @@ import argparse
 import csv
 import json
 import re
+import shutil
 import sys
 import subprocess
 from pathlib import Path
@@ -37,14 +38,6 @@ def git_check(search_query=None):
     else:
         return "No issue found"
 
-def git_deleted(search_query=None):
-    command = ['git', 'log', '--diff-filter=D', '--name-only', '--pretty=format:']
-
-    if search_query:
-        command.extend(['--grep', search_query])
-
-    return run_command(command).stdout
-
 def git_emails(repository_path='.'):
     command = ['git', 'log', '--pretty=format:%ae %ce']
     result = run_command(command)
@@ -54,12 +47,15 @@ def git_emails(repository_path='.'):
     email_pattern = re.compile(r'[\w\.-]+@[\w\.-]+')
     emails = set(email_pattern.findall(log_output))
 
-    if emails:
-        for email in emails:
-            print(f"{email}")
-        return f"{len(emails)} emails found"
-    else:
-        return print("No emails found")
+    return emails
+
+def git_geolocation(search_query=None):
+    command = ['git', 'grep -E', "'[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?)\s*[,]\s*[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)'", '--', "'*.txt'", "'*.md'", "'*.json'"]
+
+    if search_query:
+        command.extend(['--grep', search_query])
+
+    return run_command(command).stdout
 
 def git_gpg_keys():
     all_gpg_keys = []
@@ -96,11 +92,115 @@ def git_gpg_keys():
 
     return all_gpg_keys
 
+def git_network(search_query=None):
+    command_ip = ['git', 'grep', '-E', '--ignore-case', r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b']
+    result_ip = run_command(command_ip).stdout
+
+    if result_ip:
+        print(f'Possible IP addresses found: {result_ip}\n')
+    else:
+        print("No IP addresses found\n")
+
+    command_mac = ['git', 'grep', '-E', '--ignore-case', r'([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}']
+    result_mac = run_command(command_mac).stdout
+
+    if result_mac:
+        print(f'Possible MAC addresses found: {result_mac}\n')
+    else:
+        print("No MAC addresses found\n")
+
+    command_ssh = ['git', 'grep', '-E', '--ignore-case', r'ssh-[a-z]+']
+    result_ssh = run_command(command_ssh).stdout
+
+    if result_ssh:
+        print(f'Possible ssh information found: {result_ssh}')
+    else:
+        print("No SSH information found")
+
+def git_timeline_branches(search_query=None):
+    command = ['git', 'branch', '-a', '--format=%(refname:short) %(committerdate:short) %(authorname)']
+    
+    if search_query:
+        command.extend(['--grep', search_query])
+
+    result = run_command(command).stdout
+    branches = []
+
+    for branch in result.strip().split('\n'):
+        parts = branch.split()
+        branch_name = parts[0]
+        creation_date = parts[1]
+        contributors = parts[2:]
+
+        branches.append(f"{branch_name} - {', '.join(contributors)}, {creation_date}")
+
+    return branches
+
+def git_timeline_commits(search_query=None):
+    command = ['git', 'log', '--pretty=format:%h - %an, %ar : %s']
+
+    if search_query:
+        command.extend(['--grep', search_query])
+    
+    return run_command(command).stdout
+
+def git_timeline_deleted(search_query=None):
+    command = ['git', 'log', '--diff-filter=D', '--name-only', '--pretty=format:%h - %an, %ar : %s']
+
+    if search_query:
+        command.extend(['--grep', search_query])
+
+    return run_command(command).stdout
+
+def git_timeline_tags(search_query=None):
+    command = ['git', 'for-each-ref', '--sort=-taggerdate', '--format', '%(refname:short) %(taggername) %(taggerdate:short)']
+
+    if search_query:
+        command.extend(['--grep', search_query])
+
+    result = run_command(command).stdout
+
+    tags = []
+    for line in result.strip().split('\n'):
+        parts = line.split()
+        tag_name = parts[0]
+        tagger_name = parts[1] if len(parts) > 1 else 'Unknown Tagger'
+        creation_date = parts[2] if len(parts) > 2 else 'Unknown Date'
+        tags.append(f"{tag_name} - {tagger_name}, {creation_date}")
+    return tags
+
+def exif(search_query=None):
+    tool = ["exiftool"]
+
+    if shutil.which(tool[0]) is None:
+        print(f"Error: {tool[0]} command not found.")
+        return None
+
+    command = "git ls-files | grep -E '\.(gif|jpg|jpeg|png|tif|wav|webp)$' | xargs -I {} exiftool {}"
+
+    if search_query:
+        command.extend(['--grep', search_query])
+
+    result = subprocess.run(command, shell=True, capture_output=True, text=True)
+    return result.stdout
+
 def trivy():
+    tool = ["trivy"]
+
+    if shutil.which(tool[0]) is None:
+        print(f"FATAL ERROR: {tool[0]} command not found.")
+        return None
+
     command = ['trivy', 'repository', '.'] 
     return run_command(command).stdout
 
 def virustotal():
+    tool = ["vt"]
+
+    if shutil.which(tool[0]) is None:
+        print(f"FATAL ERROR: {tool[0]} command not found.")
+        return None
+
     command =  ['git', 'ls-files']
     result = run_command(command)
     files = result.stdout.split('\n')
@@ -124,6 +224,12 @@ def virustotal():
         print("No matches found")
 
 def visualize():
+    tool = ["gource"]
+
+    if shutil.which(tool[0]) is None:
+        print(f"FATAL ERROR: {tool[0]} command not found.")
+        return None
+
     command = ['gource']
     return run_command(command)
 
@@ -140,17 +246,25 @@ def export_to_csv(data, filename):
 def main():
     is_git_repository()
     parser = argparse.ArgumentParser(description='A simple Git Forensic tool')
-    parser.add_argument('--author', action='store_true', help='Display author link to a Git repository')
-    parser.add_argument('--check', action='store_true', help='Run a Git file system check')
-    parser.add_argument('--deleted', action='store_true', help='Display Git deleted files')
-    parser.add_argument('--emails', action='store_true', help='Display associated emails with this Git repository')
-    parser.add_argument('--gpg-keys', action='store_true', help='Search for GPG keys in the Git repository')
-    parser.add_argument('--trivy', action='store_true', help='Run Trivy on the repository')
-    parser.add_argument('--virustotal', action='store_true', help='Run vt against all the hash')
-    parser.add_argument('--visualize', action='store_true', help='Display Git visualization gui with gource')
-    parser.add_argument('--search', metavar='search_query', help='Search for commits based on keywords or patterns in commit messages')
+    parser.add_argument('-a', '--author', action='store_true', help='Display author')
+    parser.add_argument('-c', '--check', action='store_true', help='Run a filesystem check')
+    parser.add_argument('-e', '--emails', action='store_true', help='Display emails')
+    parser.add_argument('-x', '--exif', action='store_true', help='Display exif metadata')
+    parser.add_argument('-g', '--geolocation', action='store_true', help='Display latitude and longitude data')
+    parser.add_argument('-k', '--keys', action='store_true', help='Display gpg keys')
+    parser.add_argument('-n', '--network', action='store_true', help='Display network informations')
+    parser.add_argument('-ta', '--timeline-all', action='store_true', help='Display all Git timeline')
+    parser.add_argument('-tb', '--timeline-branches', action='store_true', help='Display Git timeline branches')
+    parser.add_argument('-tc', '--timeline-commits', action='store_true', help='Display Git timeline commits')
+    parser.add_argument('-td', '--timeline-deleted', action='store_true', help='Display Git timeline deleted objects')
+    parser.add_argument('-tt', '--timeline-tags', action='store_true', help='Display Git timeline tags')
+    parser.add_argument('-t', '--trivy', action='store_true', help='Run Trivy')
+    parser.add_argument('-vt', '--virustotal', action='store_true', help='Run virustotal')
+    parser.add_argument('-vi', '--visualize', action='store_true', help='Run gource')
+    
     parser.add_argument('--csv', metavar='filename.csv', help='Export data to CSV file')
     parser.add_argument('--json', metavar='filename.json', help='Export data to JSON file')
+    parser.add_argument('--search', metavar='search_query', help='Search for commits based on keywords or patterns in commit messages')
 
     args = parser.parse_args()
 
@@ -168,19 +282,84 @@ def main():
             check_output = git_check()
             if check_output:
                 print(check_output)
-
-        if args.deleted:
-            data.append(git_deleted(search_query))
-        
+ 
         if args.emails:
-            data.append(git_emails(search_query))
+            emails_output = git_emails()
+            if emails_output:
+                for email in emails_output:
+                    print(f"{email}")
+            else:
+                return print("No emails found")
+        
+        if args.exif:
+            exif_output = exif()
+            if exif_output:
+                print(f'{exif_output}')
+            else:
+                print("No exif metadata found")
 
-        if args.gpg_keys:
+        if args.geolocation:
+            geolocation_output = git_geolocation()
+            if geolocation_output:
+                print(f'Possible geolocation data found: {geolocation_output}')
+            else:
+                print("No geolocation data found")
+
+        if args.keys:
             gpg_output = git_gpg_keys()
             if gpg_output:
                 print(f'{gpg_output}')
             else:
                 print("No gpg keys found")
+
+        if args.network:
+            git_network()
+
+        if args.timeline_all:
+            timeline_branches_output = git_timeline_branches()
+            timeline_commits_output = git_timeline_commits()
+            timeline_deleted_output = git_timeline_deleted()
+            timeline_tags_output = git_timeline_tags()
+
+            if timeline_branches_output:
+                print("Branches:")
+                for branch in timeline_branches_output:
+                    print(f'{branch}')
+
+            if timeline_commits_output:
+                print("Commits:")
+                print(f'{timeline_commits_output}\n')
+            
+            if timeline_deleted_output:
+                print("Deleted:")
+                print(f'{timeline_deleted_output}\n')
+
+            if timeline_tags_output:
+                print("Tags:")
+                for tag in timeline_tags_output:
+                    print(f'{tag}')
+        
+        if args.timeline_branches:
+            timeline_output = git_timeline_branches()
+            if timeline_output:
+                for branch in timeline_output:
+                    print({branch})
+        
+        if args.timeline_commits:
+            timeline_output = git_timeline_commits()
+            if timeline_output:
+                print(f'{timeline_output}')
+        
+        if args.timeline_deleted:
+            timeline_output = git_timeline_deleted()
+            if timeline_output:
+                data.append(git_timeline_deleted(search_query))
+
+        if args.timeline_tags:
+            timeline_output = git_timeline_tags()
+            if timeline_output:
+                for tag in timeline_output:
+                    print({tag})
 
         if args.trivy:
             trivy_output = trivy()
