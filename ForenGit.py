@@ -43,7 +43,7 @@ def git_deleted(search_query=None):
     if search_query:
         command.extend(['--grep', search_query])
 
-    return run_command(command)
+    return run_command(command).stdout
 
 def git_emails(repository_path='.'):
     command = ['git', 'log', '--pretty=format:%ae %ce']
@@ -60,6 +60,41 @@ def git_emails(repository_path='.'):
         return f"{len(emails)} emails found"
     else:
         return print("No emails found")
+
+def git_gpg_keys():
+    all_gpg_keys = []
+
+    # Method 1: Extract GPG keys from commit signatures
+    command_method_1 = ['git', 'log', '--show-signature', '--format="%G? %GS"']
+    result_method_1 = run_command(command_method_1).stdout
+    gpg_keys_method_1 = re.findall(r'(?<=G )[A-Fa-f0-9]+', result_method_1)
+    all_gpg_keys.extend(gpg_keys_method_1)
+
+    # Method 2: Extract GPG keys from commit messages
+    command_method_2 = ['git', 'log', "--grep='[A-F0-9]\{16,\}'"]
+    result_method_2 = run_command(command_method_2).stdout
+    gpg_keys_method_2 = result_method_2.split()
+    all_gpg_keys.extend(gpg_keys_method_2)
+
+    # Method 3: Extract GPG keys from files with .asc or .gpg extension
+    command_method_3 = ['git', 'ls-files', '|', 'grep', '-E', '\.asc$|\.gpg$']
+    result_method_3 = run_command(command_method_3).stdout
+    gpg_keys_method_3 = result_method_3.split()
+    all_gpg_keys.extend(gpg_keys_method_3)
+
+    # Method 4: Extract GPG keys from commit patches
+    command_method_4 = ['git', 'log', '-p', '|', 'grep', '-B', '2', '"-----BEGIN PGP SIGNATURE-----"']
+    result_method_4 = run_command(command_method_4).stdout
+    gpg_keys_method_4 = re.findall(r'(?<=G )[A-Fa-f0-9]+', result_method_4)
+    all_gpg_keys.extend(gpg_keys_method_4)
+
+    # Method 5: Extract GPG keys from files using '-----BEGIN PGP PUBLIC KEY BLOCK-----'
+    command_method_5 = ['git', 'grep', '-E', '--ignore-case', '-----BEGIN PGP PUBLIC KEY BLOCK-----']
+    result_method_5 = run_command(command_method_5).stdout
+    gpg_keys_method_5 = re.findall(r'(?<=G )[A-Fa-f0-9]+', result_method_5)
+    all_gpg_keys.extend(gpg_keys_method_5)
+
+    return all_gpg_keys
 
 def trivy():
     command = ['trivy', 'repository', '.'] 
@@ -109,6 +144,7 @@ def main():
     parser.add_argument('--check', action='store_true', help='Run a Git file system check')
     parser.add_argument('--deleted', action='store_true', help='Display Git deleted files')
     parser.add_argument('--emails', action='store_true', help='Display associated emails with this Git repository')
+    parser.add_argument('--gpg-keys', action='store_true', help='Search for GPG keys in the Git repository')
     parser.add_argument('--trivy', action='store_true', help='Run Trivy on the repository')
     parser.add_argument('--virustotal', action='store_true', help='Run vt against all the hash')
     parser.add_argument('--visualize', action='store_true', help='Display Git visualization gui with gource')
@@ -138,6 +174,13 @@ def main():
         
         if args.emails:
             data.append(git_emails(search_query))
+
+        if args.gpg_keys:
+            gpg_output = git_gpg_keys()
+            if gpg_output:
+                print(f'{gpg_output}')
+            else:
+                print("No gpg keys found")
 
         if args.trivy:
             trivy_output = trivy()
