@@ -20,16 +20,13 @@ def run_command(command):
     result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     return result
 
-def git_author(search_query=None):
+def git_author():
     command = "git log --format='%aN' | sort -u"
-
-    if search_query:
-        command.extend(['--grep', search_query])
 
     result = subprocess.run(command, shell=True, capture_output=True, text=True)
     return result.stdout
 
-def git_check(search_query=None):
+def git_check():
     command = ['git', 'fsck', '--full', '--unreachable', '--lost-found']
     result = run_command(command).stdout.strip()
     
@@ -49,11 +46,8 @@ def git_emails(repository_path='.'):
 
     return emails
 
-def git_geolocation(search_query=None):
+def git_geolocation():
     command = ['git', 'grep -E', "'[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?)\s*[,]\s*[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)'", '--', "'*.txt'", "'*.md'", "'*.json'"]
-
-    if search_query:
-        command.extend(['--grep', search_query])
 
     return run_command(command).stdout
 
@@ -92,7 +86,7 @@ def git_gpg_keys():
 
     return all_gpg_keys
 
-def git_network(search_query=None):
+def git_network():
     command_ip = ['git', 'grep', '-E', '--ignore-case', r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b']
     result_ip = run_command(command_ip).stdout
 
@@ -117,46 +111,45 @@ def git_network(search_query=None):
     else:
         print("No SSH information found")
 
-def git_timeline_branches(search_query=None):
-    command = ['git', 'branch', '-a', '--format=%(refname:short) %(committerdate:short) %(authorname)']
-    
-    if search_query:
-        command.extend(['--grep', search_query])
+def git_statistic():
+    command = ['git', 'shortlog', '-s', '-n']
+    return run_command(command).stdout
+
+def git_timeline_branches():
+    command = ['git', 'for-each-ref', '--sort=-committerdate', '--format', '%(refname:short) %(committername) %(committerdate:short) %(committerdate:relative)']
 
     result = run_command(command).stdout
+
     branches = []
 
-    for branch in result.strip().split('\n'):
-        parts = branch.split()
+    for line in result.strip().split('\n'):
+        parts = line.split()
         branch_name = parts[0]
-        creation_date = parts[1]
-        contributors = parts[2:]
+        committer_name = parts[1]
+        commit_date_short = parts[2]
+        commit_date_relative = ' '.join(parts[3:])
 
-        branches.append(f"{branch_name} - {', '.join(contributors)}, {creation_date}")
+        branches.append(f"{branch_name} - {committer_name}, {commit_date_short} {commit_date_relative}")
 
     return branches
 
-def git_timeline_commits(search_query=None):
-    command = ['git', 'log', '--pretty=format:%h - %an, %ar : %s']
-
-    if search_query:
-        command.extend(['--grep', search_query])
-    
-    return run_command(command).stdout
-
-def git_timeline_deleted(search_query=None):
-    command = ['git', 'log', '--diff-filter=D', '--name-only', '--pretty=format:%h - %an, %ar : %s']
-
-    if search_query:
-        command.extend(['--grep', search_query])
+def git_timeline_commits():
+    command = ['git', 'log', '--pretty=format:%h - %an, %ad : %s', '--date=iso']
 
     return run_command(command).stdout
 
-def git_timeline_tags(search_query=None):
-    command = ['git', 'for-each-ref', '--sort=-taggerdate', '--format', '%(refname:short) %(taggername) %(taggerdate:short)']
+def git_timeline_deleted():
+    command = ['git', 'log', '--diff-filter=D', '--name-only', '--pretty=format:%h - %an, %ad : %s']
 
-    if search_query:
-        command.extend(['--grep', search_query])
+    result = run_command(command).stdout
+    commits = result.strip().split('\n\n')
+
+    formatted_commits = '\n'.join(commits)
+
+    return formatted_commits
+
+def git_timeline_tags():
+    command = ['git', 'for-each-ref', '--sort=-taggerdate', '--format', '%(refname:short) %(taggername) %(taggerdate:iso)']
 
     result = run_command(command).stdout
 
@@ -169,7 +162,7 @@ def git_timeline_tags(search_query=None):
         tags.append(f"{tag_name} - {tagger_name}, {creation_date}")
     return tags
 
-def exif(search_query=None):
+def exif():
     tool = ["exiftool"]
 
     if shutil.which(tool[0]) is None:
@@ -177,9 +170,6 @@ def exif(search_query=None):
         return None
 
     command = "git ls-files | grep -E '\.(gif|jpg|jpeg|png|tif|wav|webp)$' | xargs -I {} exiftool {}"
-
-    if search_query:
-        command.extend(['--grep', search_query])
 
     result = subprocess.run(command, shell=True, capture_output=True, text=True)
     return result.stdout
@@ -253,6 +243,7 @@ def main():
     parser.add_argument('-g', '--geolocation', action='store_true', help='Display latitude and longitude data')
     parser.add_argument('-k', '--keys', action='store_true', help='Display gpg keys')
     parser.add_argument('-n', '--network', action='store_true', help='Display network informations')
+    parser.add_argument('-s', '--statistic', action='store_true', help='Display commits numbers by author')
     parser.add_argument('-ta', '--timeline-all', action='store_true', help='Display all Git timeline')
     parser.add_argument('-tb', '--timeline-branches', action='store_true', help='Display Git timeline branches')
     parser.add_argument('-tc', '--timeline-commits', action='store_true', help='Display Git timeline commits')
@@ -264,7 +255,6 @@ def main():
     
     parser.add_argument('--csv', metavar='filename.csv', help='Export data to CSV file')
     parser.add_argument('--json', metavar='filename.json', help='Export data to JSON file')
-    parser.add_argument('--search', metavar='search_query', help='Search for commits based on keywords or patterns in commit messages')
 
     args = parser.parse_args()
 
@@ -272,11 +262,9 @@ def main():
         parser.print_help()
     else:
         data = []
-
-        search_query = args.search
  
         if args.author:
-            data.append(git_author(search_query))
+            data.append(git_author())
 
         if args.check:
             check_output = git_check()
@@ -315,6 +303,11 @@ def main():
         if args.network:
             git_network()
 
+        if args.statistic:
+            statistic_output = git_statistic()
+            if statistic_output:
+                print(f'{statistic_output}')
+
         if args.timeline_all:
             timeline_branches_output = git_timeline_branches()
             timeline_commits_output = git_timeline_commits()
@@ -343,7 +336,7 @@ def main():
             timeline_output = git_timeline_branches()
             if timeline_output:
                 for branch in timeline_output:
-                    print({branch})
+                    print(branch)
         
         if args.timeline_commits:
             timeline_output = git_timeline_commits()
@@ -353,13 +346,13 @@ def main():
         if args.timeline_deleted:
             timeline_output = git_timeline_deleted()
             if timeline_output:
-                data.append(git_timeline_deleted(search_query))
+                data.append(git_timeline_deleted())
 
         if args.timeline_tags:
             timeline_output = git_timeline_tags()
             if timeline_output:
                 for tag in timeline_output:
-                    print({tag})
+                    print(tag)
 
         if args.trivy:
             trivy_output = trivy()
