@@ -86,6 +86,61 @@ def git_gpg_keys():
 
     return all_gpg_keys
 
+def git_history_branches():
+    command = ['git', 'for-each-ref', '--sort=-committerdate', '--format', '%(refname:short) %(committername) %(committerdate:short) %(committerdate:relative)']
+
+    result = run_command(command).stdout
+
+    branches = []
+
+    for line in result.strip().split('\n'):
+        parts = line.split()
+        branch_name = parts[0]
+        committer_name = parts[1]
+        commit_date_short = parts[2]
+        commit_date_relative = ' '.join(parts[3:])
+
+        branches.append(f"{branch_name} - {committer_name}, {commit_date_short} {commit_date_relative}")
+
+    return branches
+
+def git_history_blame():
+    command = "git ls-files | xargs -I {} git blame --pretty=format:'%h - %an %ad : %s' --date=iso {}"
+    
+    result = subprocess.run(command, shell=True, capture_output=True)
+
+    return result.stdout.decode("utf-8", errors="replace")
+
+def git_history_commits():
+    command = ['git', 'log', '--pretty=format:%h - %an, %ad : %s', '--date=iso']
+
+    return run_command(command).stdout
+
+def git_history_deleted():
+    command = ['git', 'log', '--diff-filter=D', '--name-only', '--pretty=format:%h - %an, %ad : %s']
+
+    result = run_command(command).stdout
+    commits = result.strip().split('\n\n')
+
+    formatted_commits = '\n'.join(commits)
+
+    return formatted_commits
+
+def git_history_tags():
+    command = ['git', 'for-each-ref', '--sort=-taggerdate', '--format', '%(refname:short) %(taggername) %(taggerdate:iso)']
+
+    result = run_command(command).stdout
+
+    tags = []
+    for line in result.strip().split('\n'):
+        parts = line.split()
+        tag_name = parts[0]
+        tagger_name = parts[1] if len(parts) > 1 else 'Unknown Tagger'
+        creation_date = parts[2] if len(parts) > 2 else 'Unknown Date'
+        tags.append(f"{tag_name} - {tagger_name}, {creation_date}")
+
+    return tags
+
 def git_network():
     command_ip = ['git', 'grep', '-E', '--ignore-case', r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b']
     result_ip = run_command(command_ip).stdout
@@ -114,53 +169,6 @@ def git_network():
 def git_statistic():
     command = ['git', 'shortlog', '-s', '-n']
     return run_command(command).stdout
-
-def git_timeline_branches():
-    command = ['git', 'for-each-ref', '--sort=-committerdate', '--format', '%(refname:short) %(committername) %(committerdate:short) %(committerdate:relative)']
-
-    result = run_command(command).stdout
-
-    branches = []
-
-    for line in result.strip().split('\n'):
-        parts = line.split()
-        branch_name = parts[0]
-        committer_name = parts[1]
-        commit_date_short = parts[2]
-        commit_date_relative = ' '.join(parts[3:])
-
-        branches.append(f"{branch_name} - {committer_name}, {commit_date_short} {commit_date_relative}")
-
-    return branches
-
-def git_timeline_commits():
-    command = ['git', 'log', '--pretty=format:%h - %an, %ad : %s', '--date=iso']
-
-    return run_command(command).stdout
-
-def git_timeline_deleted():
-    command = ['git', 'log', '--diff-filter=D', '--name-only', '--pretty=format:%h - %an, %ad : %s']
-
-    result = run_command(command).stdout
-    commits = result.strip().split('\n\n')
-
-    formatted_commits = '\n'.join(commits)
-
-    return formatted_commits
-
-def git_timeline_tags():
-    command = ['git', 'for-each-ref', '--sort=-taggerdate', '--format', '%(refname:short) %(taggername) %(taggerdate:iso)']
-
-    result = run_command(command).stdout
-
-    tags = []
-    for line in result.strip().split('\n'):
-        parts = line.split()
-        tag_name = parts[0]
-        tagger_name = parts[1] if len(parts) > 1 else 'Unknown Tagger'
-        creation_date = parts[2] if len(parts) > 2 else 'Unknown Date'
-        tags.append(f"{tag_name} - {tagger_name}, {creation_date}")
-    return tags
 
 def exif():
     tool = ["exiftool"]
@@ -241,14 +249,15 @@ def main():
     parser.add_argument('-e', '--emails', action='store_true', help='Display emails')
     parser.add_argument('-x', '--exif', action='store_true', help='Display exif metadata')
     parser.add_argument('-g', '--geolocation', action='store_true', help='Display latitude and longitude data')
+    parser.add_argument('-ha', '--history-all', action='store_true', help='Display all Git history')
+    parser.add_argument('-hbl', '--history-blame', action='store_true', help='Display Git history branches')
+    parser.add_argument('-hbr', '--history-branches', action='store_true', help='Display Git history branches')
+    parser.add_argument('-hc', '--history-commits', action='store_true', help='Display Git history commits')
+    parser.add_argument('-hd', '--history-deleted', action='store_true', help='Display Git history deleted objects')
+    parser.add_argument('-ht', '--history-tags', action='store_true', help='Display Git history tags')
     parser.add_argument('-k', '--keys', action='store_true', help='Display gpg keys')
     parser.add_argument('-n', '--network', action='store_true', help='Display network informations')
     parser.add_argument('-s', '--statistic', action='store_true', help='Display commits numbers by author')
-    parser.add_argument('-ta', '--timeline-all', action='store_true', help='Display all Git timeline')
-    parser.add_argument('-tb', '--timeline-branches', action='store_true', help='Display Git timeline branches')
-    parser.add_argument('-tc', '--timeline-commits', action='store_true', help='Display Git timeline commits')
-    parser.add_argument('-td', '--timeline-deleted', action='store_true', help='Display Git timeline deleted objects')
-    parser.add_argument('-tt', '--timeline-tags', action='store_true', help='Display Git timeline tags')
     parser.add_argument('-t', '--trivy', action='store_true', help='Run Trivy')
     parser.add_argument('-vt', '--virustotal', action='store_true', help='Run virustotal')
     parser.add_argument('-vi', '--visualize', action='store_true', help='Run gource')
@@ -293,6 +302,62 @@ def main():
             else:
                 print("No geolocation data found")
 
+        if args.history_all:
+            history_blame_output = git_history_blame()
+            history_branches_output = git_history_branches()
+            history_commits_output = git_history_commits()
+            history_deleted_output = git_history_deleted()
+            history_tags_output = git_history_tags()
+
+            if history_blame_output:
+                print("Blame:")
+                print(f'{history_blame_output}')
+
+            if history_branches_output:
+                print("Branches:")
+                for branch in history_branches_output:
+                    print(f'{branch}')
+
+            if history_commits_output:
+                print("Commits:")
+                print(f'{history_commits_output}\n')
+            
+            if history_deleted_output:
+                print("Deleted:")
+                print(f'{history_deleted_output}\n')
+
+            if history_tags_output:
+                print("Tags:")
+                for tag in history_tags_output:
+                    print(f'{tag}')
+        
+        if args.history_blame:
+            history_output = git_history_blame()
+            if history_output:
+                    print(history_output)
+        
+        if args.history_branches:
+            history_output = git_history_branches()
+            if history_output:
+                for branch in history_output:
+                    print(branch)
+        
+        if args.history_commits:
+            history_output = git_history_commits()
+            if history_output:
+                print(f'{history_output}')
+        
+        if args.history_deleted:
+            history_output = git_history_deleted()
+            if history_output:
+                data.append(git_history_deleted())
+
+        if args.history_tags:
+            history_output = git_history_tags()
+            if history_output:
+                for tag in history_output:
+                    print(tag)
+
         if args.keys:
             gpg_output = git_gpg_keys()
             if gpg_output:
@@ -307,52 +372,6 @@ def main():
             statistic_output = git_statistic()
             if statistic_output:
                 print(f'{statistic_output}')
-
-        if args.timeline_all:
-            timeline_branches_output = git_timeline_branches()
-            timeline_commits_output = git_timeline_commits()
-            timeline_deleted_output = git_timeline_deleted()
-            timeline_tags_output = git_timeline_tags()
-
-            if timeline_branches_output:
-                print("Branches:")
-                for branch in timeline_branches_output:
-                    print(f'{branch}')
-
-            if timeline_commits_output:
-                print("Commits:")
-                print(f'{timeline_commits_output}\n')
-            
-            if timeline_deleted_output:
-                print("Deleted:")
-                print(f'{timeline_deleted_output}\n')
-
-            if timeline_tags_output:
-                print("Tags:")
-                for tag in timeline_tags_output:
-                    print(f'{tag}')
-        
-        if args.timeline_branches:
-            timeline_output = git_timeline_branches()
-            if timeline_output:
-                for branch in timeline_output:
-                    print(branch)
-        
-        if args.timeline_commits:
-            timeline_output = git_timeline_commits()
-            if timeline_output:
-                print(f'{timeline_output}')
-        
-        if args.timeline_deleted:
-            timeline_output = git_timeline_deleted()
-            if timeline_output:
-                data.append(git_timeline_deleted())
-
-        if args.timeline_tags:
-            timeline_output = git_timeline_tags()
-            if timeline_output:
-                for tag in timeline_output:
-                    print(tag)
 
         if args.trivy:
             trivy_output = trivy()
