@@ -11,11 +11,6 @@
 yay -S perl-image-exiftool gource trivy vt-cli
 ```
 
-# Installation
-```bash
-git clone https://github.com/MikeHorn-git/ForenGit.git
-```
-
 # Features
 * History
   * Blame
