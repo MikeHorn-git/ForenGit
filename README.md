@@ -6,10 +6,14 @@
 * [Trivy](https://github.com/aquasecurity/trivy)
 * [VirusTotal](https://github.com/veetaw/vtcli) with API key
 
+## Arch
+```bash
+yay -S perl-image-exiftool gource trivy vt-cli
+```
+
 # Installation
 ```bash
 git clone https://github.com/MikeHorn-git/ForenGit.git
-cd ForenGit/
 ```
 
 # Features
