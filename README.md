@@ -1,5 +1,7 @@
 # Git Forensics Tool
 
+![image](https://github.com/MikeHorn-git/ForenGit/assets/123373126/2b3befbb-f0f8-44db-b806-a610c72681b3)
+
 # Optional Requirements
 * [Exif](https://github.com/exiftool/exiftool)
 * [Gource](https://github.com/acaudwell/Gource)
