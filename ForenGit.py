@@ -1,3 +1,29 @@
+#! /usr/bin/python3
+
+#################################################################################
+#MIT License                                                                    #
+#                                                                               #
+#Copyright (c) 2024 MikeHorn-git                                                #
+#                                                                               #
+#Permission is hereby granted, free of charge, to any person obtaining a copy   #
+#of this software and associated documentation files (the "Software"), to deal  #
+#in the Software without restriction, including without limitation the rights   #
+#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell      #
+#copies of the Software, and to permit persons to whom the Software is          #
+#furnished to do so, subject to the following conditions:                       #
+#                                                                               #
+#The above copyright notice and this permission notice shall be included in all #
+#copies or substantial portions of the Software.                                #
+#                                                                               #
+#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR     #
+#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       #
+#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE    #
+#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER         #
+#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,  #
+#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE  #
+#SOFTWARE.                                                                      #
+#################################################################################
+
 import argparse
 import csv
 import json
@@ -6,7 +32,6 @@ import shutil
 import sys
 import subprocess
 from pathlib import Path
-from tqdm import tqdm
 
 def is_git_repository(path='.'):
     git_dir = Path(path) / '.git'
@@ -146,17 +171,21 @@ def git_network():
     result_ip = run_command(command_ip).stdout
 
     if result_ip:
-        print(f'Possible IP addresses found: {result_ip}\n')
+        print(f'Possible IP addresses found: {result_ip}')
+        print("---------------------")
     else:
-        print("No IP addresses found\n")
+        print("No IP addresses found")
+        print("---------------------")
 
     command_mac = ['git', 'grep', '-E', '--ignore-case', r'([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}']
     result_mac = run_command(command_mac).stdout
 
     if result_mac:
-        print(f'Possible MAC addresses found: {result_mac}\n')
+        print(f'Possible MAC addresses found: {result_mac}')
+        print("---------------------")
     else:
-        print("No MAC addresses found\n")
+        print("No MAC addresses found")
+        print("---------------------")
 
     command_ssh = ['git', 'grep', '-E', '--ignore-case', r'ssh-[a-z]+']
     result_ssh = run_command(command_ssh).stdout
@@ -204,7 +233,7 @@ def virustotal():
     files = result.stdout.split('\n')
     found_match = False
 
-    for file in tqdm(files, desc="Scanning files", unit="file"):
+    for file in files:
         if file:
             command = ['git', 'hash-object', file]
             result = run_command(command)
@@ -231,15 +260,21 @@ def visualize():
     command = ['gource']
     return run_command(command)
 
-def export_to_json(data, filename):
-    with open(filename, 'w') as json_file:
-        json.dump(data, json_file, indent=4)
-
-def export_to_csv(data, filename):
-    with open(filename, 'w', newline='') as csv_file:
-        csv_writer = csv.writer(csv_file)
-        for row in data:
-            csv_writer.writerow(row)
+def export_data(data, filename=None, file_type=None):
+    if filename:
+        if file_type == 'csv':
+            with open(filename, 'w', newline='') as csv_file:
+                csv_writer = csv.writer(csv_file)
+                for entry in data.split('\n'):
+                                        csv_writer.writerow([entry.strip()])
+            print(f'Data exported to {filename} in CSV format')
+        elif file_type == 'json':
+            with open(filename, 'w') as json_file:
+                json.dump(data, json_file, indent=4)
+            print(f'Data exported to {filename} in JSON format')
+    else:
+        for entry in data:
+            print(entry)
 
 def main():
     is_git_repository()
@@ -255,20 +290,21 @@ def main():
     parser.add_argument('-hc', '--history-commits', action='store_true', help='Display Git history commits')
     parser.add_argument('-hd', '--history-deleted', action='store_true', help='Display Git history deleted objects')
     parser.add_argument('-ht', '--history-tags', action='store_true', help='Display Git history tags')
-    parser.add_argument('-k', '--keys', action='store_true', help='Display gpg keys')
+    parser.add_argument('-k', '--keys', action='store_true', help='Display Gpg keys')
     parser.add_argument('-n', '--network', action='store_true', help='Display network informations')
     parser.add_argument('-s', '--statistic', action='store_true', help='Display commits numbers by author')
     parser.add_argument('-t', '--trivy', action='store_true', help='Run Trivy')
-    parser.add_argument('-vt', '--virustotal', action='store_true', help='Run virustotal')
-    parser.add_argument('-vi', '--visualize', action='store_true', help='Run gource')
-    
-    parser.add_argument('--csv', metavar='filename.csv', help='Export data to CSV file')
-    parser.add_argument('--json', metavar='filename.json', help='Export data to JSON file')
+    parser.add_argument('-vt', '--virustotal', action='store_true', help='Run Virustotal')
+    parser.add_argument('-vi', '--visualize', action='store_true', help='Run Gource') 
+    parser.add_argument('--csv', metavar='filename.csv', help='Export data to CSV file for history commands only')
+    parser.add_argument('--json', metavar='filename.json', help='Export data to JSON file for history commands only')
 
     args = parser.parse_args()
 
     if not any(vars(args).values()):
         parser.print_help()
+    elif (args.csv or args.json) and not any([args.history_all, args.history_blame, args.history_branches, args.history_commits, args.history_deleted, args.history_tags]):
+        print("FATAL ERROR: --csv or --json must be used with history command")
     else:
         data = []
  
@@ -303,60 +339,72 @@ def main():
                 print("No geolocation data found")
 
         if args.history_all:
-            history_blame_output = git_history_blame()
-            history_branches_output = git_history_branches()
-            history_commits_output = git_history_commits()
-            history_deleted_output = git_history_deleted()
-            history_tags_output = git_history_tags()
-
-            if history_blame_output:
+            if git_history_blame():
                 print("Blame:")
-                print(f'{history_blame_output}')
+                print(f'{git_history_blame()}')
 
-            if history_branches_output:
+            if git_history_branches():
                 print("Branches:")
-                for branch in history_branches_output:
+                for branch in git_history_branches():
                     print(f'{branch}')
 
-            if history_commits_output:
+            if git_history_commits():
                 print("Commits:")
-                print(f'{history_commits_output}\n')
+                print(f'{git_history_commits()}\n')
             
-            if history_deleted_output:
+            if git_history_deleted():
                 print("Deleted:")
-                print(f'{history_deleted_output}\n')
+                print(f'{git_history_deleted()}\n')
 
-            if history_tags_output:
+            if git_history_tags():
                 print("Tags:")
-                for tag in history_tags_output:
+                for tag in git_history_tags():
                     print(f'{tag}')
         
         if args.history_blame:
-            history_output = git_history_blame()
-            if history_output:
-                    print(history_output)
-        
+            if git_history_blame():
+                if args.csv:
+                    export_data(git_history_blame(), args.csv, 'csv')
+                elif args.json:
+                    export_data(git_history_blame(), args.json, 'json')
+                else:
+                    print(git_history_blame()) 
+
         if args.history_branches:
-            history_output = git_history_branches()
-            if history_output:
-                for branch in history_output:
-                    print(branch)
-        
+            if git_history_branches():
+                if args.csv:
+                    export_data(git_history_branches(), args.csv, 'csv')
+                elif args.json:
+                    export_data(git_history_branches(), args.json, 'json')
+                else:
+                    print(git_history_branches()) 
+
         if args.history_commits:
-            history_output = git_history_commits()
-            if history_output:
-                print(f'{history_output}')
-        
+            if git_history_commits():
+                if args.csv:
+                    export_data(git_history_commits(), args.csv, 'csv')
+                elif args.json:
+                    export_data(git_history_commits(), args.json, 'json')
+                else:
+                    print(git_history_commits())
+
         if args.history_deleted:
-            history_output = git_history_deleted()
-            if history_output:
-                data.append(git_history_deleted())
+            if git_history_deleted():
+                if args.csv:
+                    export_data(git_history_deleted(), args.csv, 'csv')
+                elif args.json:
+                    export_data(git_history_deleted(), args.json, 'json')
+                else:
+                    print(git_history_deleted())
 
         if args.history_tags:
-            history_output = git_history_tags()
-            if history_output:
-                for tag in history_output:
-                    print(tag)
+            if git_history_tags():
+                if args.csv:
+                    export_data(git_history_tags(), args.csv, 'csv')
+                elif args.json:
+                    export_data(git_history_tags(), args.json, 'json')
+                else:
+                    print(git_history_tags())
 
         if args.keys:
             gpg_output = git_gpg_keys()
@@ -383,19 +431,6 @@ def main():
 
         if args.visualize:
             visualize()
-
-        if args.csv:
-            export_to_csv(data, args.csv)
-            print(f'Data exported to {args.csv} in CSV format')
-
-        if args.json:
-            export_to_json(data, args.json)
-            print(f'Data exported to {args.json} in JSON format')
-
-        if not args.csv and not args.json:
-            for entry in data:
-                print(entry)
-
+ 
 if __name__ == "__main__":
     main()
-
