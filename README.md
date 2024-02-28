@@ -36,8 +36,8 @@ yay -S perl-image-exiftool gource trivy vt-cli
 
 # Usage
 ```bash
-usage: ForenGit.py [-h] [-a] [-c] [-e] [-x] [-g] [-ha] [-hbl] [-hbr] [-hc] [-hd] [-ht] [-k] [-n] [-s] [-t] [-vt]
-                   [-vi] [--csv filename.csv] [--json filename.json]
+usage: ForenGit.py [-h] [-a] [-c] [-e] [-x] [-g] [-ha] [-hbl] [-hbr] [-hc] [-hd] [-ht] [-k] [-n] [-s] [-t] [-vt] [-vi] [--csv filename.csv]
+                   [--json filename.json]
 
 A simple Git Forensic tool
 
@@ -58,12 +58,12 @@ options:
   -hd, --history-deleted
                         Display Git history deleted objects
   -ht, --history-tags   Display Git history tags
-  -k, --keys            Display gpg keys
+  -k, --keys            Display Gpg keys
   -n, --network         Display network informations
   -s, --statistic       Display commits numbers by author
   -t, --trivy           Run Trivy
-  -vt, --virustotal     Run virustotal
-  -vi, --visualize      Run gource
-  --csv filename.csv    Export data to CSV file
-  --json filename.json  Export data to JSON file
+  -vt, --virustotal     Run Virustotal
+  -vi, --visualize      Run Gource
+  --csv filename.csv    Export data to CSV file for history commands only
+  --json filename.json  Export data to JSON file for history commands only
 ```
