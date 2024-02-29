@@ -43,8 +43,7 @@ unzip Linux64.zip
 
 # Usage
 ```bash
-usage: ForenGit.py [-h] [-a] [-c] [-e] [-x] [-g] [-hbl] [-hbr] [-hc] [-hd] [-ht] [-k] [-n] [-s] [-t] [-vt] [-vi] [--csv filename.csv]
-                   [--json filename.json]
+usage: ForenGit.py [-h] [-a] [-c] [-e] [-x] [-g] [-hbl] [-hbr] [-hc] [-hd] [-ht] [-k] [-n] [-s] [-t] [-vt] [-vi]
 
 A simple Git Forensic tool
 
@@ -70,6 +69,4 @@ options:
   -t, --trivy           Run Trivy
   -vt, --virustotal     Run Virustotal
   -vi, --visualize      Run Gource
-  --csv filename.csv    Export data to CSV file for history commands only
-  --json filename.json  Export data to JSON file for history commands only
 ```
