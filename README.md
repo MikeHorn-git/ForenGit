@@ -2,24 +2,6 @@
 
 ![image](https://github.com/MikeHorn-git/ForenGit/assets/123373126/2b3befbb-f0f8-44db-b806-a610c72681b3)
 
-# Install Optional Requirements
-* [Exif](https://github.com/exiftool/exiftool)
-* [Gource](https://github.com/acaudwell/Gource)
-* [Trivy](https://github.com/aquasecurity/trivy)
-* [VirusTotal](https://github.com/veetaw/vtcli) with API key
-
-## Arch
-```bash
-yay -S perl-image-exiftool gource trivy vt-cli
-```
-
-## Kali / Parrot
-```bash
-sudo apt install exif gource trivy unzip wget
-wget https://github.com/VirusTotal/vt-cli/releases/download/1.0.0/Linux64.zip
-unzip Linux64.zip
-```
-
 # Features
 * History
   * Blame
@@ -40,6 +22,24 @@ unzip Linux64.zip
   * Git visualization tool
   * Trivy repository scanner
   * VirusTotal suspicious file scanner
+
+# Install Optional Requirements
+* [Exif](https://github.com/exiftool/exiftool)
+* [Gource](https://github.com/acaudwell/Gource)
+* [Trivy](https://github.com/aquasecurity/trivy)
+* [VirusTotal](https://github.com/veetaw/vtcli) with API key
+
+## Arch
+```bash
+yay -S perl-image-exiftool gource trivy vt-cli
+```
+
+## Kali / Parrot
+```bash
+sudo apt install exif gource trivy unzip wget
+wget https://github.com/VirusTotal/vt-cli/releases/download/1.0.0/Linux64.zip
+unzip Linux64.zip
+```
 
 # Usage
 ```bash
