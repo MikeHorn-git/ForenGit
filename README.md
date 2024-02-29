@@ -2,7 +2,7 @@
 
 ![image](https://github.com/MikeHorn-git/ForenGit/assets/123373126/2b3befbb-f0f8-44db-b806-a610c72681b3)
 
-# Optional Requirements
+# Install Optional Requirements
 * [Exif](https://github.com/exiftool/exiftool)
 * [Gource](https://github.com/acaudwell/Gource)
 * [Trivy](https://github.com/aquasecurity/trivy)
@@ -11,6 +11,13 @@
 ## Arch
 ```bash
 yay -S perl-image-exiftool gource trivy vt-cli
+```
+
+## Kali / Parrot
+```bash
+sudo apt install exif gource trivy unzip wget
+wget https://github.com/VirusTotal/vt-cli/releases/download/1.0.0/Linux64.zip
+unzip Linux64.zip
 ```
 
 # Features
@@ -36,7 +43,7 @@ yay -S perl-image-exiftool gource trivy vt-cli
 
 # Usage
 ```bash
-usage: ForenGit.py [-h] [-a] [-c] [-e] [-x] [-g] [-ha] [-hbl] [-hbr] [-hc] [-hd] [-ht] [-k] [-n] [-s] [-t] [-vt] [-vi] [--csv filename.csv]
+usage: ForenGit.py [-h] [-a] [-c] [-e] [-x] [-g] [-hbl] [-hbr] [-hc] [-hd] [-ht] [-k] [-n] [-s] [-t] [-vt] [-vi] [--csv filename.csv]
                    [--json filename.json]
 
 A simple Git Forensic tool
@@ -48,7 +55,6 @@ options:
   -e, --emails          Display emails
   -x, --exif            Display exif metadata
   -g, --geolocation     Display latitude and longitude data
-  -ha, --history-all    Display all Git history
   -hbl, --history-blame
                         Display Git history branches
   -hbr, --history-branches
